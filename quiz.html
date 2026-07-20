@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>証券市場論1 予想問題アプリ</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--ok:#16a34a;--ng:#dc2626;--warn:#d97706}
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;background:var(--bg);color:var(--text)}
+header{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 16px}
+.wrap{max-width:980px;margin:auto}.top{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+h1{font-size:20px;margin:0}.stats{font-size:14px;color:var(--muted)}
+main{max-width:980px;margin:20px auto;padding:0 16px 80px}
+.panel,.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 3px 14px rgba(0,0,0,.04)}
+.panel{padding:16px;margin-bottom:16px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+select,button,input[type=number]{font:inherit;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:white}
+button{cursor:pointer;font-weight:700}button.primary{background:var(--accent);color:white;border-color:var(--accent)}button.ghost{background:white}
+button:disabled{opacity:.45;cursor:not-allowed}.progress{height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin-top:12px}.bar{height:100%;width:0;background:var(--accent);transition:.25s}
+.card{padding:22px}.meta{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;margin-bottom:14px}.q{font-size:21px;line-height:1.65;font-weight:800;margin-bottom:18px}
+.choice{display:block;border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin:10px 0;cursor:pointer;transition:.15s}.choice:hover{border-color:#9ca3af;background:#f9fafb}.choice input{margin-right:10px;transform:scale(1.15)}
+.choice.correct{border-color:var(--ok);background:#f0fdf4}.choice.wrong{border-color:var(--ng);background:#fef2f2}
+.feedback{display:none;margin-top:16px;padding:14px;border-radius:12px;line-height:1.65}.feedback.ok{display:block;background:#f0fdf4;color:#166534}.feedback.ng{display:block;background:#fef2f2;color:#991b1b}
+.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.hidden{display:none!important}.result{text-align:center;padding:28px}.score{font-size:52px;font-weight:900;margin:10px 0}.small{color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:16px}.statbox{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:12px}
+.reviewItem{padding:14px 0;border-bottom:1px solid var(--line)}.reviewItem:last-child{border-bottom:0}.tag{display:inline-block;background:#eef2ff;color:#3730a3;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:700;margin-bottom:8px}
+kbd{background:#111827;color:white;border-radius:6px;padding:2px 6px;font-size:12px}
+@media(max-width:640px){.q{font-size:18px}.card{padding:16px}.actions button{flex:1}}
+</style>
+</head>
+<body>
+<header><div class="wrap top"><h1>証券市場論1 予想問題アプリ</h1><div class="stats" id="headerStats">全問演習モード</div></div></header>
+<main>
+<section id="setup" class="panel">
+  <div class="controls">
+    <label>出題範囲
+      <select id="cat"></select>
+    </label>
+    <label>問題数
+      <select id="count"><option>10</option><option>20</option><option>30</option><option value="999">全問</option></select>
+    </label>
+    <label><input type="checkbox" id="shuffle" checked> シャッフル</label>
+    <label><input type="checkbox" id="wrongOnly"> 前回の誤答だけ</label>
+    <button class="primary" id="start">開始</button>
+    <button class="ghost" id="resetHistory">履歴リセット</button>
+  </div>
+  <div class="small" style="margin-top:10px">選択問題・複数選択・数値入力に対応。誤答は自動保存され、復習できます。</div>
+</section>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<section id="quiz" class="card hidden">
+  <div class="meta"><span id="metaCat"></span><span id="metaNo"></span></div>
+  <div class="q" id="q"></div>
+  <div id="choices"></div>
+  <div id="feedback" class="feedback"></div>
+  <div class="actions">
+    <button id="showAnswer" class="ghost">答えを見る</button>
+    <button id="submit" class="primary">回答する</button>
+    <button id="next" class="primary hidden">次へ</button>
+  </div>
+</section>
+<section id="result" class="card hidden"></section>
+</main>
+<script>
+const ALL = [{"type": "single", "cat": "金融市場の基礎", "q": "最終的な貸し手から最終的な借り手へ資金が流れる際に、金融仲介機関が介在する金融を何というか。", "choices": ["直接金融", "間接金融", "市場型金融", "相対金融"], "ans": [1], "exp": "銀行などの金融仲介機関が介在する場合は間接金融です。"}, {"type": "multi", "cat": "金融市場の基礎", "q": "本源的証券を発行して契約を締結するとみなせる金融取引をすべて選べ。", "choices": ["預金", "銀行借入", "社債発行", "新株発行"], "ans": [1, 2, 3], "exp": "銀行借入では借用証書、社債・新株発行ではそれぞれ債券・株式という本源的証券が発行されます。預金は銀行が発行する間接証券です。"}, {"type": "single", "cat": "金融市場の基礎", "q": "市場型取引の説明として正しいものはどれか。", "choices": ["特定の金融機関と1対1で取引する", "価格や金利は過去の取引関係だけで決まる", "株式市場や債券市場が代表例である", "貸出条件は常に一律である"], "ans": [2], "exp": "市場型取引には多数の主体が参加し、株式市場・債券市場が代表例です。"}, {"type": "multi", "cat": "金融市場の基礎", "q": "長期金融市場に該当するものをすべて選べ。", "choices": ["債券市場", "株式市場", "金融派生商品市場", "コール市場"], "ans": [0, 1, 2], "exp": "長期金融市場は1年超の取引で、債券・株式・金融派生商品市場が含まれます。コール市場は短期金融市場です。"}, {"type": "single", "cat": "金融市場の基礎", "q": "新たに発行される証券を投資家が購入する市場はどれか。", "choices": ["流通市場", "発行市場", "相対市場", "決済市場"], "ans": [1], "exp": "新規発行証券を売り出す市場が発行市場です。"}, {"type": "single", "cat": "金融市場の基礎", "q": "既に発行された証券を投資家間で売買する市場はどれか。", "choices": ["発行市場", "流通市場", "公募市場", "私募市場"], "ans": [1], "exp": "既発行証券の売買は流通市場で行われます。"}, {"type": "single", "cat": "金融市場の基礎", "q": "資金を借りた証拠として、利息の支払いと元本返済を約束して発行される証券を何というか。", "choices": ["株式", "債券", "預金証書", "小切手"], "ans": [1], "exp": "債券は、発行者が利息支払いと元本返済を約束して発行する債務証書です。"}, {"type": "single", "cat": "金融市場の基礎", "q": "特定の人に対して特定の行為を要求する権利を何というか。", "choices": ["債務", "債権", "格付", "償還"], "ans": [1], "exp": "要求する側の権利が債権、要求される側の義務が債務です。"}, {"type": "single", "cat": "金融市場の基礎", "q": "X氏がY銀行からお金を借りた。正しい関係はどれか。", "choices": ["X氏が債権者、Y銀行が債務者", "Y銀行が債権者、X氏が債務者", "両者とも債権者", "両者とも債務者"], "ans": [1], "exp": "返済を請求できるY銀行が債権者、返済義務を負うX氏が債務者です。"}, {"type": "single", "cat": "短期金融市場", "q": "インターバンク市場の中心的な取引はどれか。", "choices": ["約束手形", "有担保コール翌日物", "無担保コール翌日物", "CP"], "ans": [2], "exp": "無担保コール翌日物が中心で、その金利は日銀の誘導対象です。"}, {"type": "single", "cat": "短期金融市場", "q": "企業が資金調達のために発行する短期の社債を売買する市場はどれか。", "choices": ["CD市場", "CP市場", "TDB市場", "コール市場"], "ans": [1], "exp": "CPはCommercial Paperで、優良企業が発行する短期社債です。"}, {"type": "single", "cat": "短期金融市場", "q": "譲渡性預金を売買する市場はどれか。", "choices": ["CD市場", "CP市場", "TDB市場", "債券現先市場"], "ans": [0], "exp": "CDはCertificate of Deposit、譲渡性預金です。"}, {"type": "single", "cat": "短期金融市場", "q": "国庫短期証券を売買する市場はどれか。", "choices": ["CD市場", "CP市場", "TDB市場", "コール市場"], "ans": [2], "exp": "TDBはTreasury Discount Bills、国庫短期証券です。"}, {"type": "multi", "cat": "短期金融市場", "q": "現金担保付債券貸借取引（債券レポ）の説明として正しいものをすべて選べ。", "choices": ["現金を担保に主として国債を貸し借りする", "経済的には債券現先取引と同じ効果をもつ", "債券の借り手は現金を差し出す", "グローバル・スタンダードである"], "ans": [0, 1, 2], "exp": "日本型の債券レポは現金担保付債券貸借。経済効果は現先と同じですが、グローバル標準は債券現先取引です。"}, {"type": "single", "cat": "短期金融市場", "q": "債券現先取引で資金調達する側が取引開始時に行うことはどれか。", "choices": ["債券を貸す", "債券を借りる", "債券を売る", "債券を買う"], "ans": [2], "exp": "債券を売って現金を受け取り、将来買い戻すことで資金調達します。"}, {"type": "single", "cat": "金融政策", "q": "日銀の役割として空欄に入る語は何か。日本銀行券の発行、（　）の安定、決済システムの安定。", "choices": ["株価", "為替", "物価", "地価"], "ans": [2], "exp": "日銀の主要目的の一つは物価の安定です。"}, {"type": "multi", "cat": "金融政策", "q": "伝統的金融政策の操作目標に該当するものをすべて選べ。", "choices": ["マネーストック", "マネタリーベース", "準備預金量", "短期金利", "長期金利"], "ans": [1, 2, 3], "exp": "直接コントロール可能な操作目標はマネタリーベース、準備預金量、短期金利です。"}, {"type": "single", "cat": "金融政策", "q": "必要準備率を引き下げると、一般に金融機関の貸出余力はどうなるか。", "choices": ["増える", "減る", "変わらない", "必ずゼロになる"], "ans": [0], "exp": "拘束される準備が減り、貸出可能資金が増えます。"}, {"type": "single", "cat": "金融政策", "q": "公開市場操作で金融緩和を行う組み合わせはどれか。", "choices": ["市場へ資金供給→金利上昇", "市場へ資金供給→金利低下", "市場から資金吸収→金利低下", "市場から資金吸収→金利不変"], "ans": [1], "exp": "資金供給で市場の資金量が増えると、短期金利は低下しやすくなります。"}, {"type": "single", "cat": "金融政策", "q": "公開市場操作の主な誘導対象となる市場金利はどれか。", "choices": ["公定歩合", "無担保コール翌日物金利", "有担保コール翌日物金利", "10年国債金利のみ"], "ans": [1], "exp": "短期金融市場の無担保コール翌日物金利が主な誘導対象です。"}, {"type": "single", "cat": "金融政策", "q": "将来も低金利を継続すると市場に予想させ、長期金利の低下を促す政策はどれか。", "choices": ["量的緩和", "フォワード・ガイダンス", "信用緩和", "マイナス金利政策"], "ans": [1], "exp": "将来の政策方針を示すのがフォワード・ガイダンスです。"}, {"type": "multi", "cat": "金融政策", "q": "量的緩和政策が増大させようとするものをすべて選べ。", "choices": ["日銀当座預金残高", "マネタリーベース", "ETFやJ-REITの価格だけ", "CPや社債の発行額だけ"], "ans": [0, 1], "exp": "量的緩和は日銀当座預金残高・マネタリーベースの拡大を重視します。"}, {"type": "single", "cat": "金融政策", "q": "物価が持続的に上昇することを何というか。", "choices": ["デフレーション", "インフレーション", "スタグネーション", "ディスインフレーション"], "ans": [1], "exp": "物価の持続的上昇はインフレーションです。"}, {"type": "single", "cat": "債券の基礎", "q": "債券が発行されてから元本が返済されるまでの期間を何というか。", "choices": ["残存期間", "償還期限", "保有期間", "平均回収年数"], "ans": [1], "exp": "発行から返済までが償還期限・満期です。購入時点から満期までは残存期間です。"}, {"type": "single", "cat": "債券の基礎", "q": "既発債を購入した場合、購入日から満期までの期間を何というか。", "choices": ["償還期間", "発行期間", "残存期間", "募集期間"], "ans": [2], "exp": "購入時点から満期までが残存期間です。"}, {"type": "single", "cat": "債券の基礎", "q": "慣行として債券の額面金額はいくらとされるか。", "choices": ["10円", "100円", "1,000円", "10,000円"], "ans": [1], "exp": "講義上の計算では額面100円が基準です。"}, {"type": "single", "cat": "債券の基礎", "q": "債券の額面金額に対する1年当たりの利子の割合を何というか。", "choices": ["利回り", "割引率", "利率", "スポットレート"], "ans": [2], "exp": "利率はクーポンレートとも呼ばれ、額面に対する年間利子の割合です。"}, {"type": "single", "cat": "債券の基礎", "q": "満期3年、額面100円、年率10%、年2回払いの利付債で、3年間に受け取る総額はいくらか。", "choices": ["100円", "110円", "130円", "160円"], "ans": [2], "exp": "年間利子10円×3年=30円、元本100円を加えて130円です。"}, {"type": "multi", "cat": "債券の基礎", "q": "発行時点で利子額が確定しない利付債をすべて選べ。", "choices": ["固定利付債", "変動利付債", "割引債", "物価連動債"], "ans": [1, 3], "exp": "変動利付債は基準金利、物価連動債は物価指数に連動するため、将来の利子額が確定しません。"}, {"type": "single", "cat": "債券の基礎", "q": "割引債の説明として正しいものはどれか。", "choices": ["額面より高く発行し差額を利子とする", "額面より低く発行し償還時との差額を利子とする", "毎年必ずクーポンが支払われる", "元本が物価に連動する"], "ans": [1], "exp": "割引債は額面以下で発行され、償還差益が利子に相当します。"}, {"type": "single", "cat": "債券の基礎", "q": "債券などの元本・利息が約定通り支払われる確実性を第三者機関が評価し段階表示したものは何か。", "choices": ["格付", "利回り", "デュレーション", "信用創造"], "ans": [0], "exp": "信用力を段階評価するのが格付です。"}, {"type": "single", "cat": "債券の基礎", "q": "債券価格と市場金利の関係として正しいものはどれか。", "choices": ["金利上昇→債券価格上昇", "金利上昇→債券価格下落", "金利低下→債券価格下落", "両者は無関係"], "ans": [1], "exp": "市場金利が上がると、既発債の魅力が低下して価格は下がります。"}, {"type": "single", "cat": "国債・社債", "q": "国が税収などの収入で支出を賄いきれないとき、財政法4条に基づき公共事業費等に充てるため発行する国債は何か。", "choices": ["建設国債", "特例国債", "借換債", "財投債"], "ans": [0], "exp": "建設国債は四条国債とも呼ばれます。"}, {"type": "single", "cat": "国債・社債", "q": "建設国債でも歳入が不足する場合、特別法により発行される赤字国債は何か。", "choices": ["建設国債", "特例国債", "借換債", "復興債"], "ans": [1], "exp": "赤字国債は特例国債です。"}, {"type": "single", "cat": "国債・社債", "q": "2026年度当初予算の国債発行予定額で最も大きい区分はどれか。", "choices": ["新規国債", "復興債", "借換債", "財投債"], "ans": [2], "exp": "既存国債の償還資金を調達する借換債の比重が大きいです。"}, {"type": "single", "cat": "国債・社債", "q": "政府関係機関が発行し、政府保証が付かない債券を何というか。", "choices": ["政府保証債", "財投機関債", "財投債", "金融債"], "ans": [1], "exp": "政府保証がない政府関係機関債が財投機関債です。"}, {"type": "single", "cat": "国債・社債", "q": "現在の会社法上、社債を発行できる会社について正しい説明はどれか。", "choices": ["すべての会社が発行可能", "適債基準を満たす上場企業のみ", "10年以下だけ全会社が発行可能", "銀行のみ"], "ans": [0], "exp": "現在は原則としてすべての会社が社債を発行できます。"}, {"type": "single", "cat": "国債・社債", "q": "発行額の大きい債券を複数の引受会社で共同引受する集まりは何か。", "choices": ["カルテル", "コンソーシアム", "引受シンジケート団", "クレジットライン"], "ans": [2], "exp": "共同引受の集まりは引受シンジケート団です。"}, {"type": "multi", "cat": "国債・社債", "q": "引受募集の特徴として正しいものをすべて選べ。", "choices": ["発行予定総額の調達が発行体に保証される", "売れ残りは引受会社が引き取る", "売れ残りは必ず発行体が引き取る", "必ず資金調達に失敗する"], "ans": [0, 1], "exp": "引受会社が残額を引き受けるため、発行体は予定額を調達できます。"}, {"type": "single", "cat": "国債・社債", "q": "国債の主要な発行形式はどれか。", "choices": ["募集発行", "入札発行", "売出発行", "私募発行"], "ans": [1], "exp": "国債は原則として入札発行が中心です。"}, {"type": "single", "cat": "国債・社債", "q": "広く一般投資家を対象に債券を発行する方式は何か。", "choices": ["私募", "公募", "相対", "レポ"], "ans": [1], "exp": "一般投資家向けは公募、特定少数向けは私募です。"}, {"type": "single", "cat": "国債・社債", "q": "顧客の売買を円滑にするため、自ら売買相手となるディーラー業務を担う主体はどれか。", "choices": ["銀行", "生命保険会社", "年金基金", "証券会社"], "ans": [3], "exp": "債券流通市場では証券会社がディーラーとして自己売買します。"}, {"type": "single", "cat": "債券計算", "q": "現在価値とは何か。", "choices": ["現在の価値を将来の価値に換算したもの", "将来の価値を現在の価値に換算したもの", "現在と将来の差額", "元本だけの価値"], "ans": [1], "exp": "将来受け取る金額を割引率で現在に割り戻したものです。"}, {"type": "single", "cat": "債券計算", "q": "割引率2%のとき、現在の200万円の1年後の価値として最も近いものはどれか。", "choices": ["196万円", "200万円", "204万円"], "ans": [2], "exp": "200×1.02=204万円。"}, {"type": "single", "cat": "債券計算", "q": "割引率2%のとき、1年後の200万円の現在価値として最も近いものはどれか。", "choices": ["196万円", "200万円", "204万円"], "ans": [0], "exp": "200÷1.02≒196.08万円。"}, {"type": "multi", "cat": "債券計算", "q": "将来価値と年数が一定のとき割引率が大きくなると現在価値はどうなるか。また、将来価値と割引率が一定のとき年数が長くなるとどうなるか。", "choices": ["割引率が大きいほど現在価値は小さくなる", "割引率が大きいほど現在価値は大きくなる", "年数が長いほど現在価値は小さくなる", "年数が長いほど現在価値は大きくなる"], "ans": [0, 2], "exp": "PV=FV/(1+r)^nなので、rやnが大きいほどPVは小さくなります。"}, {"type": "single", "cat": "債券計算", "q": "満期3年、額面100円、年1回クーポン5円、割引率5%の債券価格はいくらか。", "choices": ["97円", "100円", "103円"], "ans": [1], "exp": "クーポンレートと割引率が等しいので価格は額面100円です。"}, {"type": "single", "cat": "債券計算", "q": "額面100円、満期3年の割引債を割引率5%で評価した理論価格として最も近いものはどれか。", "choices": ["86円", "95円", "100円"], "ans": [0], "exp": "100/(1.05)^3≒86.38円。"}, {"type": "single", "cat": "債券計算", "q": "満期3年、額面100円、年1回クーポン5円、割引率4%の債券価格として最も近いものはどれか。", "choices": ["97円", "100円", "103円"], "ans": [2], "exp": "クーポンレート5%が割引率4%を上回るので、価格は額面超えになります。"}, {"type": "single", "cat": "債券計算", "q": "直接利回りは、債券購入によって得られる何の比率か。", "choices": ["インカム・ゲイン", "キャピタル・ゲイン", "インカム＋キャピタル"], "ans": [0], "exp": "直接利回り=年間クーポン÷購入価格。"}, {"type": "single", "cat": "債券計算", "q": "クーポン5円、債券価格95円の直接利回りとして最も近いものはどれか。", "choices": ["4.7%", "5.0%", "5.3%"], "ans": [2], "exp": "5÷95×100≒5.26%。"}, {"type": "single", "cat": "債券計算", "q": "流通債券を購入して満期まで保有する場合の利回りを何というか。", "choices": ["応募者利回り", "最終利回り", "所有期間利回り"], "ans": [1], "exp": "満期まで保有する前提の利回りは最終利回りです。"}, {"type": "single", "cat": "債券計算", "q": "額面100円、購入価格90円、残存5年、クーポン7円の債券の単利最終利回りは何%か。", "choices": ["8%", "10%", "12%"], "ans": [1], "exp": "{7+(100-90)/5}÷90×100=10%。"}, {"type": "single", "cat": "債券計算", "q": "満期10年、クーポン4円の国債が発行5年後に80円で取引されている。満期保有時の単利最終利回りは何%か。", "choices": ["8%", "10%", "12%"], "ans": [1], "exp": "残存5年なので{4+(100-80)/5}÷80×100=10%。"}, {"type": "single", "cat": "債券計算", "q": "複利最終利回りがクーポンレートを上回るとき、債券価格は通常どうなるか。", "choices": ["100円未満", "100円", "100円超"], "ans": [0], "exp": "利回りがクーポンレートより高い場合、価格は額面未満になります。"}, {"type": "multi", "cat": "債券計算", "q": "割引国債の利回りについて正しいものをすべて選べ。", "choices": ["クーポン再投資効果を考えなくてよい", "価格と残存期間から利回りは一意に決まる", "残存1年で価格90円なら利回りは必ず10%である"], "ans": [0, 1], "exp": "3つ目は誤り。100/90-1=11.11%です。"}, {"type": "single", "cat": "スポットレート・デュレーション", "q": "残存1年、クーポン5円、価格90円の利付債から求める1年スポットレートとして最も近いものはどれか。", "choices": ["12%", "17%", "22%"], "ans": [1], "exp": "90=105/(1+r)よりr=16.67%≒17%。"}, {"type": "single", "cat": "スポットレート・デュレーション", "q": "1年スポットレートが17%のとき、残存1年の額面100円の割引債価格として最も近いものはどれか。", "choices": ["85円", "90円", "117円"], "ans": [0], "exp": "100/1.17≒85.47円。講義では四捨五入前を使えば86円も正解扱い。"}, {"type": "single", "cat": "スポットレート・デュレーション", "q": "デュレーションの2つの意味に共通して入る語は何か。『（　）のキャッシュフローの平均回収年数』『金利変動に対する（　）価格の変動の大きさ』", "choices": ["株式", "債券", "為替", "預金"], "ans": [1], "exp": "いずれも債券です。"}, {"type": "single", "cat": "スポットレート・デュレーション", "q": "500円投資し、1年目100円、2年目200円、3年目200円回収するとき、割引率0の平均回収年数は何年か。", "choices": ["1.8年", "2.0年", "2.2年"], "ans": [2], "exp": "1×100/500+2×200/500+3×200/500=2.2年。"}, {"type": "single", "cat": "スポットレート・デュレーション", "q": "満期・割引率が同じなら、クーポンが大きい債券のデュレーションはどうなるか。", "choices": ["大きくなる", "小さくなる", "無関係"], "ans": [1], "exp": "早い時点でより多く回収するため平均回収年数は短くなります。"}, {"type": "single", "cat": "スポットレート・デュレーション", "q": "クーポン・割引率が同じなら、満期が長い債券のデュレーションはどうなるか。", "choices": ["大きくなる", "小さくなる", "無関係"], "ans": [0], "exp": "一般に満期が長いほどデュレーションは大きくなります。"}, {"type": "multi", "cat": "スポットレート・デュレーション", "q": "割引債と利付債のデュレーションについて正しいものをすべて選べ。", "choices": ["同じ残存年数なら利付債の方が常に小さい", "割引債のデュレーションは残存年数に一致する", "利付債のデュレーションは残存年数に一致する"], "ans": [0, 1], "exp": "割引債は満期時に一括回収なのでデュレーション=残存年数。利付債は途中回収があるため短いです。"}, {"type": "multi", "cat": "スポットレート・デュレーション", "q": "債券価格の変化率と金利変動の関係として正しいものをすべて選べ。", "choices": ["デュレーションが大きいほど価格変化率は大きい", "デュレーションが大きいほど価格変化率は小さい", "デュレーションが小さいほど価格変化率は小さい"], "ans": [0, 2], "exp": "小さな金利変化に対する価格変化率は概ねデュレーションに比例します。"}, {"type": "single", "cat": "スポットレート・デュレーション", "q": "クーポンが同じ2債券で満期が異なる場合、金利上昇時の価格下落幅が大きいのはどちらか。", "choices": ["満期が長い債券", "満期が短い債券", "同じ"], "ans": [0], "exp": "満期が長いほどデュレーションが大きく、金利感応度も高くなります。"}, {"type": "multi", "cat": "外国為替", "q": "為替取引に該当するものをすべて選べ。", "choices": ["銀行振込", "郵便為替", "小切手", "電子マネーによる支払い", "現金を直接輸送"], "ans": [0, 1, 2, 3], "exp": "現金を直接輸送せずに決済・資金移動を行うのが為替です。"}, {"type": "single", "cat": "外国為替", "q": "国境を越えて行われる為替を何というか。", "choices": ["国内為替", "外国為替", "直物為替", "先物為替"], "ans": [1], "exp": "国境を越える決済・資金移動は外国為替です。"}, {"type": "single", "cat": "外国為替", "q": "日本で『1ドル=160円』という表示方法はどれか。", "choices": ["自国通貨建て", "外国通貨建て"], "ans": [0], "exp": "外国通貨1単位を自国通貨何単位で表すので自国通貨建てです。"}, {"type": "single", "cat": "外国為替", "q": "1ドル=125円から1ドル=150円になることを何というか。", "choices": ["円高", "円安", "ドル安", "為替固定"], "ans": [1], "exp": "1ドルを買うのに必要な円が増えたため、円の価値は低下し円安です。"}, {"type": "multi", "cat": "外国為替", "q": "円高の説明として正しいものをすべて選べ。", "choices": ["外国通貨に対して円の価値が上がる", "外国通貨に対して円の価値が下がる", "円に対して外国通貨の価値が下がる"], "ans": [0, 2], "exp": "円高は円の価値上昇であり、相対的に外国通貨の価値は下落します。"}, {"type": "multi", "cat": "外国為替", "q": "為替レートと購買行動について正しいものをすべて選べ。", "choices": ["円安になると外国人が日本の財・サービスを購入しやすい", "円安になると日本人が外国の財・サービスを購入しやすい", "円高になると日本人が外国の財・サービスを購入しやすい"], "ans": [0, 2], "exp": "円安は訪日客など外国人に有利、円高は日本人の海外購買に有利です。"}, {"type": "single", "cat": "外国為替", "q": "1ドル=90円で90万円をドル預金（金利5%）に1年間預け、1年後1ドル=100円になった。円換算額はいくらか。", "choices": ["95万円", "100万円", "105万円"], "ans": [2], "exp": "90万円÷90=1万ドル→1.05万ドル→×100円=105万円。"}, {"type": "single", "cat": "外国為替", "q": "外国為替市場で金融機関同士が取引する市場は何か。", "choices": ["対顧客市場", "インターバンク市場", "オープン市場", "債券市場"], "ans": [1], "exp": "金融機関同士はインターバンク市場です。"}, {"type": "single", "cat": "外国為替", "q": "異なる2通貨の対米ドル相場から計算する直接交換レートを何というか。", "choices": ["スポットレート", "クロスレート", "先物レート", "レポレート"], "ans": [1], "exp": "対ドル相場を媒介して求めるのがクロスレートです。"}, {"type": "single", "cat": "外国為替", "q": "1ドル=100円、1ユーロ=2ドルのとき、1ユーロは何円か。", "choices": ["50円", "100円", "200円"], "ans": [2], "exp": "2ドル×100円=200円。"}, {"type": "single", "cat": "外国為替", "q": "1ドル=100円、1ドル=2ポンドのとき、1ポンドは何円か。", "choices": ["50円", "100円", "200円"], "ans": [0], "exp": "1ポンド=0.5ドルなので50円。"}, {"type": "single", "cat": "外国為替", "q": "外国為替市場の主要市場で取引額が最も大きい国・地域はどこか。", "choices": ["米国", "英国", "シンガポール", "日本", "香港"], "ans": [1], "exp": "BIS調査では英国（ロンドン）が最大です。"}, {"type": "single", "cat": "外国為替", "q": "主要為替市場の取引時間について正しいものはどれか。", "choices": ["各市場が24時間営業している", "各市場は所定時間だが中心が移ることで世界全体として24時間取引できる"], "ans": [1], "exp": "東京→ロンドン→ニューヨークなどと中心が移ります。"}, {"type": "single", "cat": "外国為替", "q": "世界の金融機関を結ぶ決済ネットワークシステムは何か。", "choices": ["SWIFT", "CLS", "BIS", "CP"], "ans": [0], "exp": "SWIFTは金融メッセージングネットワークです。"}, {"type": "single", "cat": "外国為替", "q": "外為決済リスクを削減する仕組みを何決済というか。", "choices": ["SWIFT決済", "CLS決済", "BIS決済", "CD決済"], "ans": [1], "exp": "CLS決済は外為取引の元本決済リスクを抑えます。"}, {"type": "single", "cat": "外国為替", "q": "売買契約成立後2営業日を超えた将来日に、契約時の条件で外貨を受け渡す取引はどれか。", "choices": ["直物為替取引", "先物為替取引"], "ans": [1], "exp": "将来の受渡しをあらかじめ決めるのが先物為替取引です。"}, {"type": "single", "cat": "外国為替", "q": "直物相場と先物相場の差を何というか。", "choices": ["スプレッド", "スポットレート", "クロスレート", "デュレーション"], "ans": [0], "exp": "直先スプレッドまたはスワップポイントと呼びます。"}, {"type": "single", "cat": "外国為替", "q": "先物プレミアムの状態はどれか。", "choices": ["金利の高い通貨の先物が直物より高い", "金利の低い通貨の先物が直物より高い", "両通貨の金利と無関係"], "ans": [1], "exp": "金利平価では低金利通貨が先物プレミアムになります。"}, {"type": "single", "cat": "外国為替", "q": "直物1ドル=100円、円金利1%、ドル金利5%のとき、1年後の先物相場として最も近いものはどれか。", "choices": ["96円", "100円", "104円"], "ans": [0], "exp": "F=100×1.01/1.05≒96.19円。"}, {"type": "single", "cat": "外国為替", "q": "先物相場と直物相場の価格差が金利差に一致する状態を何というか。", "choices": ["購買力平価", "金利平価", "為替介入", "信用平価"], "ans": [1], "exp": "裁定が働き、先物プレミアム・ディスカウントが金利差に一致するのが金利平価です。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "自由な貿易を前提に、長期的には2国間の財・サービス価格が均衡する水準で為替レートが決まるという説は何か。", "choices": ["金利平価説", "購買力平価説", "貨幣数量説", "効率的市場仮説"], "ans": [1], "exp": "購買力平価説は一物一価の法則を国際的に拡張した考えです。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "1ドル=100円で均衡していたとき、米国の物価が10%上昇し日本の物価が不変なら、購買力平価から新しい為替レートは約何円か。", "choices": ["91円", "100円", "110円"], "ans": [0], "exp": "100=1.1×SよりS=90.91円。"}, {"type": "multi", "cat": "購買力平価・預金貸出", "q": "貿易収支と通貨価値の関係として一般に予想されるものをすべて選べ。", "choices": ["貿易黒字国の通貨価値は上がる", "貿易黒字国の通貨価値は下がる", "貿易赤字国の通貨価値は下がる"], "ans": [0, 2], "exp": "黒字国通貨には買い需要、赤字国通貨には売り圧力がかかりやすいと考えます。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "米国のスターバックス4.5ドル、日本500円ならスターバックス指数はいくらか。", "choices": ["91円/ドル", "111円/ドル", "160円/ドル"], "ans": [1], "exp": "500÷4.5=111.11円/ドル。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "実勢が1ドル=160円、スターバックス指数が111円/ドルなら円はどう評価されるか。", "choices": ["過小評価され円安", "過大評価され円高", "過小評価され円高", "過大評価され円安"], "ans": [0], "exp": "実勢の円/ドルが指数より大きいので、円は相対的に安すぎる=過小評価です。"}, {"type": "multi", "cat": "購買力平価・預金貸出", "q": "預金・貸出市場について正しいものをすべて選べ。", "choices": ["預金は銀行の負債", "貸出は銀行の資産", "相対型取引市場である"], "ans": [0, 1, 2], "exp": "銀行から見て預金は返済義務なので負債、貸出は回収権なので資産です。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "預入期間に定めのある預金を何というか。", "choices": ["要求払い預金", "定期性預金", "外貨預金", "決済用預金"], "ans": [1], "exp": "期間に定めがあるのが定期性預金です。"}, {"type": "multi", "cat": "購買力平価・預金貸出", "q": "要求払い預金に該当するものをすべて選べ。", "choices": ["当座預金", "普通預金", "決済用預金", "定期預金", "譲渡性預金"], "ans": [0, 1, 2], "exp": "要求に応じて払い戻される当座・普通・決済用預金が該当します。"}, {"type": "multi", "cat": "購買力平価・預金貸出", "q": "預金保険制度の保護対象外となるものをすべて選べ。", "choices": ["当座預金", "無利息型普通預金", "有利息型普通預金", "定期預金", "譲渡性預金", "外貨預金"], "ans": [4, 5], "exp": "譲渡性預金と外貨預金は預金保険の対象外です。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "手形割引の説明として正しいものはどれか。", "choices": ["銀行が満期までの利息を差し引いて手形を買い取る", "借用証書を使う長期貸付", "銀行が約束手形を発行する"], "ans": [0], "exp": "手形割引は手形を割引料控除後の金額で買い取る取引です。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "企業と銀行が貸出枠を決め、その範囲内なら企業の請求により貸出実行を約束する契約は何か。", "choices": ["コミットメント契約", "シンジケートローン", "プロジェクトファイナンス"], "ans": [0], "exp": "一定枠内の貸出を約束するのがコミットメント契約です。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "金融部門から経済全体に供給されている通貨の総量を何というか。", "choices": ["マネタリーベース", "マネーストック", "準備預金", "信用量"], "ans": [1], "exp": "一般の経済主体が保有する通貨量がマネーストックです。"}, {"type": "single", "cat": "購買力平価・預金貸出", "q": "銀行貸出が決済・預金を通じて当初以上の預金を生み出すことを何というか。", "choices": ["信用創造", "公開市場操作", "信用緩和", "貨幣錯覚"], "ans": [0], "exp": "銀行の貸出と預金の連鎖による預金創出が信用創造です。"}, {"type": "number", "cat": "債券計算", "q": "額面100円、残存4年、クーポン6円、購入価格92円の単利最終利回りを求めよ（小数第1位まで、%）。", "ans_num": 8.7, "tol": 0.1, "exp": "{6+(100-92)/4}÷92×100=8.695...%"}, {"type": "number", "cat": "外国為替", "q": "直物1ドル=150円、円金利1%、ドル金利2%のとき、1年後の先物相場を求めよ（小数第1位まで、円）。", "ans_num": 148.5, "tol": 0.1, "exp": "150×1.01÷1.02=148.529...円"}, {"type": "number", "cat": "債券計算", "q": "割引率4%のとき、2年後の108万円の現在価値を求めよ（小数第1位まで、万円）。", "ans_num": 99.9, "tol": 0.1, "exp": "108÷1.04²=99.852...万円"}];
+let quiz=[], idx=0, correct=0, answered=false, userAnswers=[], wrongIds=new Set(JSON.parse(localStorage.getItem('wrongIds')||'[]'));
+const $=s=>document.querySelector(s);
+const cats=['全範囲',...new Set(ALL.map(x=>x.cat))];
+$('#cat').innerHTML=cats.map(c=>`<option>${c}</option>`).join('');
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function start(){
+ let pool=ALL.map((q,i)=>({...q,id:i}));
+ const cat=$('#cat').value;
+ if(cat!=='全範囲') pool=pool.filter(q=>q.cat===cat);
+ if($('#wrongOnly').checked) pool=pool.filter(q=>wrongIds.has(q.id));
+ if($('#shuffle').checked) shuffle(pool);
+ const n=+$('#count').value; quiz=pool.slice(0,n);
+ if(!quiz.length){alert('該当する問題がありません。');return}
+ idx=0;correct=0;userAnswers=[];answered=false;
+ $('#setup').classList.add('hidden');$('#result').classList.add('hidden');$('#quiz').classList.remove('hidden');
+ render();
+}
+function render(){
+ const x=quiz[idx];answered=false;
+ $('#metaCat').textContent=x.cat;$('#metaNo').textContent=`${idx+1} / ${quiz.length}`;
+ $('#headerStats').textContent=`正解 ${correct} / ${idx}`;
+ $('#q').textContent=x.q;$('#feedback').className='feedback';$('#feedback').textContent='';
+ $('#submit').classList.remove('hidden');$('#showAnswer').classList.remove('hidden');$('#next').classList.add('hidden');
+ const box=$('#choices');box.innerHTML='';
+ if(x.type==='number'){
+   box.innerHTML=`<input id="numAns" type="number" step="any" placeholder="数値を入力" style="width:100%;max-width:300px">`;
+ }else{
+   x.choices.forEach((c,i)=>{
+    const type=x.type==='multi'?'checkbox':'radio';
+    const lab=document.createElement('label');lab.className='choice';
+    lab.innerHTML=`<input type="${type}" name="ans" value="${i}">${c}`;
+    box.appendChild(lab);
+   });
+ }
+ $('#bar').style.width=`${idx/quiz.length*100}%`;
+}
+function selected(){
+ const x=quiz[idx];
+ if(x.type==='number'){const v=parseFloat($('#numAns').value);return Number.isFinite(v)?v:null}
+ return [...document.querySelectorAll('input[name=ans]:checked')].map(e=>+e.value);
+}
+function isCorrect(x,s){
+ if(x.type==='number') return s!==null && Math.abs(s-x.ans_num)<=x.tol;
+ return JSON.stringify([...s].sort((a,b)=>a-b))===JSON.stringify([...x.ans].sort((a,b)=>a-b));
+}
+function mark(x,s,forced=false){
+ if(answered)return; answered=true;
+ const ok=!forced && isCorrect(x,s); if(ok)correct++;
+ if(ok)wrongIds.delete(x.id); else wrongIds.add(x.id);
+ localStorage.setItem('wrongIds',JSON.stringify([...wrongIds]));
+ userAnswers.push({q:x,sel:s,ok});
+ if(x.type!=='number'){
+  document.querySelectorAll('.choice').forEach((lab,i)=>{
+   if(x.ans.includes(i)) lab.classList.add('correct');
+   if(s.includes?.(i)&&!x.ans.includes(i)) lab.classList.add('wrong');
+   lab.querySelector('input').disabled=true;
+  });
+ }else $('#numAns').disabled=true;
+ const answerText=x.type==='number'?`${x.ans_num}`:x.ans.map(i=>x.choices[i]).join('／');
+ const f=$('#feedback');f.className='feedback '+(ok?'ok':'ng');
+ f.innerHTML=`<b>${ok?'正解！':'不正解'}</b><br>答え：${answerText}<br>${x.exp}`;
+ $('#submit').classList.add('hidden');$('#showAnswer').classList.add('hidden');$('#next').classList.remove('hidden');
+ $('#headerStats').textContent=`正解 ${correct} / ${idx+1}`;
+}
+$('#submit').onclick=()=>{
+ const s=selected(); const x=quiz[idx];
+ if((x.type==='number'&&s===null)||(x.type!=='number'&&s.length===0)){alert('回答を選択・入力してください。');return}
+ mark(x,s,false);
+};
+$('#showAnswer').onclick=()=>mark(quiz[idx], quiz[idx].type==='number'?null:[], true);
+$('#next').onclick=()=>{idx++; if(idx>=quiz.length) finish(); else render()};
+function finish(){
+ $('#quiz').classList.add('hidden');$('#result').classList.remove('hidden');$('#bar').style.width='100%';
+ const pct=Math.round(correct/quiz.length*100);
+ const by={}; userAnswers.forEach(a=>{by[a.q.cat]??={n:0,c:0};by[a.q.cat].n++;if(a.ok)by[a.q.cat].c++});
+ let html=`<div class="result"><div class="small">結果</div><div class="score">${pct}点</div><div>${correct} / ${quiz.length}問正解</div></div>`;
+ html+=`<div class="grid">${Object.entries(by).map(([k,v])=>`<div class="statbox"><b>${k}</b><br>${v.c}/${v.n}問正解</div>`).join('')}</div>`;
+ const wrong=userAnswers.filter(a=>!a.ok);
+ if(wrong.length){
+  html+=`<h3>誤答復習</h3>`+wrong.map(a=>`<div class="reviewItem"><span class="tag">${a.q.cat}</span><div><b>${a.q.q}</b></div><div class="small" style="margin-top:6px">答え：${a.q.type==='number'?a.q.ans_num:a.q.ans.map(i=>a.q.choices[i]).join('／')}<br>${a.q.exp}</div></div>`).join('');
+ }
+ html+=`<div class="actions"><button class="ghost" onclick="location.reload()">条件を変える</button><button class="primary" onclick="retryWrong()">今回の誤答だけ再挑戦</button></div>`;
+ $('#result').innerHTML=html;$('#headerStats').textContent=`最終結果 ${pct}点`;
+}
+window.retryWrong=()=>{
+ quiz=userAnswers.filter(a=>!a.ok).map(a=>a.q);
+ if(!quiz.length){alert('誤答はありません。');return}
+ idx=0;correct=0;userAnswers=[];$('#result').classList.add('hidden');$('#quiz').classList.remove('hidden');render();
+}
+$('#start').onclick=start;
+$('#resetHistory').onclick=()=>{if(confirm('誤答履歴をリセットしますか？')){wrongIds.clear();localStorage.removeItem('wrongIds');alert('リセットしました')}}; 
+</script>
+</body>
+</html>
